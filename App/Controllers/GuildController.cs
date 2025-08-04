@@ -5,6 +5,7 @@ using Shared.database.account;
 using Shared.database.guild; 
 using Shared.utils;
 using System;
+using System.Collections.Generic;
 
 
 namespace App.Controllers
@@ -87,6 +88,47 @@ namespace App.Controllers
             Response.CreateError(status.GetInfo());
         }
         //*815602
+        [HttpPost("getBannerManifest")]
+        public void GetBannerManifest([FromForm] string guid, [FromForm] string password, 
+            [FromForm] string currentManifest = "")
+        {
+            var status = _core.Database.Verify(guid, password, out DbAccount acc);
+            if (status != DbLoginStatus.OK)
+            {
+                Response.CreateError(status.GetInfo());
+                return;
+            }
+
+            try
+            {
+                // Check if Guild 1 has a banner (expand this later for all guilds)
+                var banner = new DbGuildBanner(_core.Database.Conn, 1);
+                var updatedBanners = new List<object>();
+        
+                if (!string.IsNullOrEmpty(banner.BannerData))
+                {
+                    updatedBanners.Add(new
+                    {
+                        guildId = 1,
+                        version = 1,
+                        lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    });
+                }
+
+                var response = new
+                {
+                    success = true,
+                    updatedBanners = updatedBanners,
+                    deletedBanners = new List<int>()
+                };
+
+                Response.CreateText(System.Text.Json.JsonSerializer.Serialize(response));
+            }
+            catch (Exception ex)
+            {
+                Response.CreateError($"Failed to get manifest: {ex.Message}");
+            }
+        }
         [HttpPost("getGuildBanner")]
         public IActionResult GetGuildBanner([FromForm] string guid, [FromForm] string password, 
             [FromForm] int guildId)
