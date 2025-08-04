@@ -6,6 +6,7 @@ using Shared.database.guild;
 using Shared.utils;
 using System;
 
+
 namespace App.Controllers
 {
     [ApiController]
@@ -85,11 +86,49 @@ namespace App.Controllers
 
             Response.CreateError(status.GetInfo());
         }
+        //*815602
+        [HttpPost("getGuildBanner")]
+        public IActionResult GetGuildBanner([FromForm] string guid, [FromForm] string password, 
+            [FromForm] int guildId)
+        {
+            // Authenticate user
+            var status = _core.Database.Verify(guid, password, out DbAccount acc);
+            if (status != DbLoginStatus.OK)
+            {
+                return BadRequest($"Authentication failed: {status.GetInfo()}");
+            }
 
-       
+            try
+            {
+                var banner = new DbGuildBanner(_core.Database.Conn, guildId);
+        
+                if (string.IsNullOrEmpty(banner.BannerData))
+                {
+                    return Ok(new { 
+                        success = false, 
+                        message = "No banner found for this guild",
+                        guildId = guildId 
+                    });
+                }
+
+                return Ok(new { 
+                    success = true,
+                    guildId = guildId,
+                    bannerData = banner.BannerData,
+                    lastUpdated = banner.LastUpdated,
+                    createdBy = banner.CreatedBy
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error retrieving banner for guild {guildId}: {ex.Message}");
+                return StatusCode(500, $"Failed to retrieve banner: {ex.Message}");
+            }
+        }
+
         [HttpPost("setBanner")]
-        public IActionResult SetBanner([FromForm] string type, [FromForm] string bannerData, 
-            [FromForm] int width, [FromForm] int height, 
+        public IActionResult SetBanner([FromForm] string type, [FromForm] string bannerData,
+            [FromForm] int width, [FromForm] int height,
             [FromForm] string guildName)
         {
             Console.WriteLine("SetBanner method called!");
@@ -111,16 +150,10 @@ namespace App.Controllers
             banner.FlushAsync().Wait(); // Or await if you make this method async
 
             Console.WriteLine($"Saved banner to Redis with key: guild.banner.{testGuildId}");
-
+          
             return Ok(new { success = true, message = "Banner saved successfully" });
         }
-        public class SetBannerRequest
-        {
-            public string type { get; set; }
-            public string bannerData { get; set; }
-            public int width { get; set; }
-            public int height { get; set; }
-            public string guildName { get; set; }
-        }
+        //*815602
     }
+    
 } // Only one closing brace for the namespace
