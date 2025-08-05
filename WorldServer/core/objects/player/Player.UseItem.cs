@@ -516,10 +516,54 @@ namespace WorldServer.core.objects
                     default:
                         StaticLogger.Instance.Warn("Activate effect {0} not implemented.", eff.Effect);
                         break;
+                    //*815602
+                    case ActivateEffects.ActivateBanner:
+                        AEActivateBanner(item, target, eff);
+                        break;
                 }
             }
         }
+        //*815602
+        private void AEActivateBanner(Item item, Position target, ActivateEffect eff)
+        {
+            var guildId = Client.Account.GuildId;
+            if (guildId <= 0)
+            {
+                SendError("You must be in a guild to place banners!");
+                return;
+            }
 
+            // Create unique banner instance ID
+            var bannerInstanceId = $"banner_{guildId}_{Id}_{DateTime.Now.Ticks}";
+    
+            try
+            {
+                // Create banner entity in the world
+                var bannerEntity = new BannerEntity(GameServer, bannerInstanceId, guildId, Id);
+                bannerEntity.Move(target.X, target.Y);
+                World.EnterWorld(bannerEntity);
+
+                // Send activation data to all clients in the area
+                // This tells clients: "entity #X should render as guild #Y banner"
+                World.BroadcastIfVisible(new Notification()
+                {
+                    Color = new ARGB(0xFF00FF00),
+                    ObjectId = Id,
+                    Message = $"BANNER_ACTIVATE:{bannerInstanceId}:{guildId}:{bannerEntity.Id}"
+                }, this);
+
+                // Send success message to placing player
+                SendInfo($"Guild banner placed! (ID: {bannerInstanceId})");
+        
+                StaticLogger.Instance.Info($"Player {Name} placed banner {bannerInstanceId} for guild {guildId} at ({target.X}, {target.Y})");
+
+            }
+            catch (Exception ex)
+            {
+                StaticLogger.Instance.Error($"Error creating banner entity: {ex.Message}");
+                SendError("Failed to place banner!");
+            }
+        }
         private void AEBulletCreate(Item item, Position target, ActivateEffect eff)
         {
             var shootAngle = Math.Atan2(target.Y - Y, target.X - X);

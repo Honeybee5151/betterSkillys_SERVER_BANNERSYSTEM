@@ -2,7 +2,7 @@
 using StackExchange.Redis;
 using Shared.database.account;
 using Shared.database.guild; 
-
+//815602
 namespace Shared.database.guild
 {
     public class DbGuildBanner : RedisObject
