@@ -88,6 +88,95 @@ namespace App.Controllers
             Response.CreateError(status.GetInfo());
         }
         //*815602
+        [HttpPost("placeBanner")]
+public IActionResult PlaceBanner([FromForm] string guid, [FromForm] string password,
+    [FromForm] float worldX, [FromForm] float worldY, [FromForm] int guildId)
+{
+    // Authenticate user
+    var status = _core.Database.Verify(guid, password, out DbAccount acc);
+    if (status != DbLoginStatus.OK)
+    {
+        return BadRequest(new { 
+            success = false, 
+            message = $"Authentication failed: {status.GetInfo()}" 
+        });
+    }
+
+    try
+    {
+        // Validate player is in the guild they're trying to place for
+        if (acc.GuildId != guildId)
+        {
+            return BadRequest(new { 
+                success = false, 
+                message = "You can only place banners for your own guild" 
+            });
+        }
+
+        // Check if guild has banner data
+        var banner = new DbGuildBanner(_core.Database.Conn, guildId);
+        if (string.IsNullOrEmpty(banner.BannerData))
+        {
+            return BadRequest(new { 
+                success = false, 
+                message = "Your guild doesn't have a banner design" 
+            });
+        }
+
+        // Basic validation (you can add more checks here)
+        if (!IsValidBannerPlacement(acc, worldX, worldY, guildId))
+        {
+            return BadRequest(new { 
+                success = false, 
+                message = "Invalid banner placement location" 
+            });
+        }
+
+        // Generate unique banner instance ID
+        string bannerInstanceId = $"banner_{guildId}_{worldX}_{worldY}_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+
+        // Here you would:
+        // 1. Add banner object to the game world database
+        // 2. Notify all players in the area via your game server
+        
+        // For now, just log and return success
+        Console.WriteLine($"Banner placed: {bannerInstanceId} at ({worldX}, {worldY}) for guild {guildId}");
+        
+        // TODO: Send notification to game server to spawn banner object
+        // NotifyGameServerBannerPlaced(bannerInstanceId, worldX, worldY, guildId, 0x3787);
+
+        return Ok(new { 
+            success = true,
+            message = "Banner placed successfully",
+            bannerInstanceId = bannerInstanceId,
+            worldX = worldX,
+            worldY = worldY,
+            guildId = guildId,
+            objectId = 0x3787 // Banner object ID from your XML
+        });
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error placing banner: {ex.Message}");
+        return StatusCode(500, new { 
+            success = false, 
+            message = $"Failed to place banner: {ex.Message}" 
+        });
+    }
+}
+
+private bool IsValidBannerPlacement(DbAccount account, float x, float y, int guildId)
+{
+    // Add your placement validation logic here
+    // Examples:
+    // - Check if location is in valid area
+    // - Check cooldowns
+    // - Check if another banner is too close
+    // - Check guild permissions
+    
+    // For now, always allow
+    return true;
+}
         [HttpPost("getBannerManifest")]
         public void GetBannerManifest([FromForm] string guid, [FromForm] string password, 
             [FromForm] string currentManifest = "")
