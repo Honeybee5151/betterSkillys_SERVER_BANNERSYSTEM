@@ -43,7 +43,6 @@
         ObjectToss,
         Fame,
         //*815602
-        Guildbannerid,
         ActivateBanner,
 
         // to be added
