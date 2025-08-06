@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using WorldServer.core.objects;
 using WorldServer.core.structures;
 using WorldServer.core.worlds;
 using WorldServer.utils;
 using Shared.resources;
+using WorldServer.core.net.stats;
+
 //815602
 namespace WorldServer.core.objects
 {
@@ -21,7 +24,7 @@ namespace WorldServer.core.objects
         private const int BANNER_LIFETIME_MS = 300000; // 5 minutes
 
         public BannerEntity(GameServer gameServer, string bannerInstanceId, int guildId, int placedByPlayerId) 
-            : base(gameServer, 0x0735, null, true, false, false) // Use any object type ID for banners
+            : base(gameServer, 0x3787, null, true, false, false) // Use any object type ID for banners
         {
             BannerInstanceId = bannerInstanceId;
             GuildId = guildId;
@@ -63,7 +66,18 @@ namespace WorldServer.core.objects
                 createdTime = _createdTime.Ticks
             };
         }
+        protected override void ExportStats(IDictionary<StatDataType, object> stats, bool isOtherPlayer)
+        {
+            base.ExportStats(stats, isOtherPlayer);
 
+            // Add logging to verify this is being called
+            Console.WriteLine($"BannerEntity.ExportStats: Adding guildId {GuildId} as stat 200");
+    
+            // Use stat ID 200 (well above the highest used ID of 142)
+            stats[(StatDataType)200] = GuildId;
+    
+            Console.WriteLine($"BannerEntity.ExportStats: Stats now contains {stats.Count} entries");
+        }
         /// <summary>
         /// Check if banner should be removed (expired, etc.)
         /// </summary>
