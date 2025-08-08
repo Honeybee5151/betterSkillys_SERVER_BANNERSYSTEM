@@ -38,6 +38,7 @@
         LTBoost,
         UnlockSkin,
         MysteryDyes,
+        //lol
         GenericActivate,
         Unlock,
         ObjectToss,
