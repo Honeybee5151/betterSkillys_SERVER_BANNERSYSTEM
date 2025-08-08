@@ -42,7 +42,7 @@
         Unlock,
         ObjectToss,
         Fame,
-        //*815602
+        //815602
         ActivateBanner,
 
         // to be added
