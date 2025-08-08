@@ -37,6 +37,10 @@ jobs:
             # Configure git safely
             git config --global --add safe.directory /home/honeybee5151/O7/realm-server-master
             
+            # FIX: Update remote URL to point to the correct repository
+            echo "🔧 Updating repository URL..."
+            git remote set-url origin https://github.com/Honeybee5151/betterSkillys_SERVER_BANNERSYSTEM.git
+            
             echo "🔄 Updating code..."
             git reset --hard HEAD
             git clean -fd
