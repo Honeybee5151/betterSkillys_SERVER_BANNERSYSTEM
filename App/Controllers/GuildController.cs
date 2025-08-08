@@ -192,8 +192,6 @@ public void GetBannerManifest([FromForm] string guid, [FromForm] string password
     {
         var updatedBanners = new List<object>();
         
-        // Check all guilds that have banners (or just the player's guild)
-        // For now, check player's guild if they're in one
         if (acc.GuildId > 0)
         {
             var banner = new DbGuildBanner(_core.Database.Conn, acc.GuildId);
@@ -201,10 +199,30 @@ public void GetBannerManifest([FromForm] string guid, [FromForm] string password
             {
                 updatedBanners.Add(new
                 {
-                    guildId = acc.GuildId, // Use ACTUAL guild ID
+                    guildId = acc.GuildId,
                     version = 1,
                     lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                 });
+                
+                // ALSO ADD THE HASH VERSION for guild hall compatibility
+                var guild = _core.Database.GetGuild(acc.GuildId);
+                if (guild != null)
+                {
+                    int guildNameHash = HashGuildName(guild.Name);
+                    // Copy the banner data to the hash-based ID
+                    var hashBanner = new DbGuildBanner(_core.Database.Conn, guildNameHash);
+                    hashBanner.BannerData = banner.BannerData;
+                    hashBanner.LastUpdated = banner.LastUpdated;
+                    hashBanner.CreatedBy = banner.CreatedBy;
+                    hashBanner.FlushAsync().Wait();
+                    
+                    updatedBanners.Add(new
+                    {
+                        guildId = guildNameHash,
+                        version = 1,
+                        lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    });
+                }
             }
         }
 
@@ -221,6 +239,17 @@ public void GetBannerManifest([FromForm] string guid, [FromForm] string password
     {
         Response.CreateError($"Failed to get manifest: {ex.Message}");
     }
+}
+
+// Add this helper method
+private int HashGuildName(string guildName)
+{
+    int hash = 0;
+    foreach (char c in guildName)
+    {
+        hash = hash * 31 + c;
+    }
+    return Math.Abs(hash % 10000);
 }
         [HttpPost("getGuildBanner")]
         public IActionResult GetGuildBanner([FromForm] string guid, [FromForm] string password, 
