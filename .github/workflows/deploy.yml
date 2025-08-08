@@ -4,7 +4,6 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -54,11 +53,18 @@ jobs:
             dotnet restore
             dotnet build --configuration Release
             
-            # Verify build succeeded
-            if [ ! -f "bin/Release/net6.0/RotMG.dll" ]; then
-              echo "❌ Build failed - RotMG.dll not found!"
+            # Verify build succeeded - Check for both DLL files
+            if [ ! -f "App/bin/Release/net8.0/App.dll" ]; then
+              echo "❌ Build failed - App.dll not found!"
               exit 1
             fi
+            
+            if [ ! -f "WorldServer/bin/Release/net8.0/WorldServer.dll" ]; then
+              echo "❌ Build failed - WorldServer.dll not found!"
+              exit 1
+            fi
+            
+            echo "✅ Build succeeded - Both DLLs found!"
             
             # === Start both services ===
             echo "🚀 Starting rotmg service..."
@@ -69,7 +75,6 @@ jobs:
             
             # Wait for services to start and check status
             sleep 3
-
             # Check status for rotmg
             if systemctl is-active --quiet rotmg; then
               echo "✅ rotmg service started successfully!"
@@ -80,7 +85,6 @@ jobs:
               journalctl -u rotmg --no-pager -n 20
               exit 1
             fi
-
             # Check status for rotmg2
             if systemctl is-active --quiet rotmg2; then
               echo "✅ rotmg2 service started successfully!"
@@ -91,5 +95,4 @@ jobs:
               journalctl -u rotmg2 --no-pager -n 20
               exit 1
             fi
-
             echo "✅ Deployment completed!"
