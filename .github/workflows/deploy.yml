@@ -44,7 +44,10 @@ jobs:
             echo "🔄 Updating code..."
             git reset --hard HEAD
             git clean -fd
-            git pull origin master
+            
+            # FORCE PULL - overwrite divergent branches
+            git fetch origin master
+            git reset --hard origin/master
             
             # === Stop both services ===
             echo "🛑 Stopping rotmg service..."
