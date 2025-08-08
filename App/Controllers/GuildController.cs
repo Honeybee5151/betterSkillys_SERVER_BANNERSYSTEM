@@ -177,47 +177,51 @@ private bool IsValidBannerPlacement(DbAccount account, float x, float y, int gui
     // For now, always allow
     return true;
 }
-        [HttpPost("getBannerManifest")]
-        public void GetBannerManifest([FromForm] string guid, [FromForm] string password, 
-            [FromForm] string currentManifest = "")
-        {
-            var status = _core.Database.Verify(guid, password, out DbAccount acc);
-            if (status != DbLoginStatus.OK)
-            {
-                Response.CreateError(status.GetInfo());
-                return;
-            }
+[HttpPost("getBannerManifest")]
+public void GetBannerManifest([FromForm] string guid, [FromForm] string password, 
+    [FromForm] string currentManifest = "")
+{
+    var status = _core.Database.Verify(guid, password, out DbAccount acc);
+    if (status != DbLoginStatus.OK)
+    {
+        Response.CreateError(status.GetInfo());
+        return;
+    }
 
-            try
-            {
-                // Check if Guild 1 has a banner (expand this later for all guilds)
-                var banner = new DbGuildBanner(_core.Database.Conn, 1);
-                var updatedBanners = new List<object>();
+    try
+    {
+        var updatedBanners = new List<object>();
         
-                if (!string.IsNullOrEmpty(banner.BannerData))
-                {
-                    updatedBanners.Add(new
-                    {
-                        guildId = 1,
-                        version = 1,
-                        lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
-                    });
-                }
-
-                var response = new
-                {
-                    success = true,
-                    updatedBanners = updatedBanners,
-                    deletedBanners = new List<int>()
-                };
-
-                Response.CreateText(System.Text.Json.JsonSerializer.Serialize(response));
-            }
-            catch (Exception ex)
+        // Check all guilds that have banners (or just the player's guild)
+        // For now, check player's guild if they're in one
+        if (acc.GuildId > 0)
+        {
+            var banner = new DbGuildBanner(_core.Database.Conn, acc.GuildId);
+            if (!string.IsNullOrEmpty(banner.BannerData))
             {
-                Response.CreateError($"Failed to get manifest: {ex.Message}");
+                updatedBanners.Add(new
+                {
+                    guildId = acc.GuildId, // Use ACTUAL guild ID
+                    version = 1,
+                    lastUpdate = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                });
             }
         }
+
+        var response = new
+        {
+            success = true,
+            updatedBanners = updatedBanners,
+            deletedBanners = new List<int>()
+        };
+
+        Response.CreateText(System.Text.Json.JsonSerializer.Serialize(response));
+    }
+    catch (Exception ex)
+    {
+        Response.CreateError($"Failed to get manifest: {ex.Message}");
+    }
+}
         [HttpPost("getGuildBanner")]
         public IActionResult GetGuildBanner([FromForm] string guid, [FromForm] string password, 
             [FromForm] int guildId)
@@ -258,31 +262,42 @@ private bool IsValidBannerPlacement(DbAccount account, float x, float y, int gui
         }
 
         [HttpPost("setBanner")]
-        public IActionResult SetBanner([FromForm] string type, [FromForm] string bannerData,
-            [FromForm] int width, [FromForm] int height,
-            [FromForm] string guildName)
+        public IActionResult SetBanner([FromForm] string guid, [FromForm] string password,
+            [FromForm] string type, [FromForm] string bannerData,
+            [FromForm] int width, [FromForm] int height)
         {
-            Console.WriteLine("SetBanner method called!");
-            Console.WriteLine($"Received banner for guild: {guildName}");
-            Console.WriteLine($"Data length: {bannerData?.Length ?? 0}");
-
-            // Validate the data
-            if (string.IsNullOrEmpty(bannerData) || width != 20 || height != 32)
+            // Authenticate user first
+            var status = _core.Database.Verify(guid, password, out DbAccount acc);
+            if (status != DbLoginStatus.OK)
             {
-                Console.WriteLine("Invalid banner data received");
-                return BadRequest("Invalid banner data");
+                return BadRequest($"Authentication failed: {status.GetInfo()}");
             }
 
-            int testGuildId = 1;
-            var banner = new DbGuildBanner(_core.Database.Conn, testGuildId);
+            // Check if user is in a guild
+            if (acc.GuildId <= 0)
+            {
+                return BadRequest("You must be in a guild to create banners");
+            }
+
+            // Check if user has permission (guild rank)
+            if (acc.GuildRank < 20) // Adjust rank requirement as needed
+            {
+                return BadRequest("Insufficient guild permissions");
+            }
+
+            // Use the ACTUAL guild ID from the authenticated account
+            int actualGuildId = acc.GuildId;
+            var banner = new DbGuildBanner(_core.Database.Conn, actualGuildId);
             banner.BannerData = bannerData;
             banner.LastUpdated = DateTime.UtcNow;
-            banner.CreatedBy = guildName;
-            banner.FlushAsync().Wait(); // Or await if you make this method async
+            banner.CreatedBy = acc.Name; // Use account name, not guild name
+            banner.FlushAsync().Wait();
 
-            Console.WriteLine($"Saved banner to Redis with key: guild.banner.{testGuildId}");
-          
-            return Ok(new { success = true, message = "Banner saved successfully" });
+            return Ok(new { 
+                success = true, 
+                message = "Banner saved successfully",
+                guildId = actualGuildId 
+            });
         }
         //*815602
     }
