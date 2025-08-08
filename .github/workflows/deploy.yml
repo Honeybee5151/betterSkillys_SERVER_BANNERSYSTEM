@@ -1,0 +1,95 @@
+name: Deploy to VPS
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '6.0.x'
+          
+      - name: Build project
+        run: |
+          dotnet restore
+          dotnet build --configuration Release
+          
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_IPV4 }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e  # Exit on any error
+            
+            # Navigate to project directory
+            cd /home/honeybee5151/O7/realm-server-master
+            
+            # Configure git safely
+            git config --global --add safe.directory /home/honeybee5151/O7/realm-server-master
+            
+            echo "🔄 Updating code..."
+            git reset --hard HEAD
+            git clean -fd
+            git pull origin master
+            
+            # === Stop both services ===
+            echo "🛑 Stopping rotmg service..."
+            systemctl stop rotmg
+            
+            echo "🛑 Stopping rotmg2 service..."
+            systemctl stop rotmg2
+            
+            echo "🔨 Building server..."
+            dotnet restore
+            dotnet build --configuration Release
+            
+            # Verify build succeeded
+            if [ ! -f "bin/Release/net6.0/RotMG.dll" ]; then
+              echo "❌ Build failed - RotMG.dll not found!"
+              exit 1
+            fi
+            
+            # === Start both services ===
+            echo "🚀 Starting rotmg service..."
+            systemctl start rotmg
+            
+            echo "🚀 Starting rotmg2 service..."
+            systemctl start rotmg2
+            
+            # Wait for services to start and check status
+            sleep 3
+
+            # Check status for rotmg
+            if systemctl is-active --quiet rotmg; then
+              echo "✅ rotmg service started successfully!"
+              systemctl status rotmg --no-pager -l
+            else
+              echo "❌ rotmg service failed to start!"
+              systemctl status rotmg --no-pager -l
+              journalctl -u rotmg --no-pager -n 20
+              exit 1
+            fi
+
+            # Check status for rotmg2
+            if systemctl is-active --quiet rotmg2; then
+              echo "✅ rotmg2 service started successfully!"
+              systemctl status rotmg2 --no-pager -l
+            else
+              echo "❌ rotmg2 service failed to start!"
+              systemctl status rotmg2 --no-pager -l
+              journalctl -u rotmg2 --no-pager -n 20
+              exit 1
+            fi
+
+            echo "✅ Deployment completed!"
